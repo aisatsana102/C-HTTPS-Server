@@ -1,7 +1,10 @@
 /*####################################################
 ##                                                  ##
+##              HTTPS Server in C                   ##
+##              By William Hocking                  ##
 ##                                                  ##
 ####################################################*/
+
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 
@@ -9,77 +12,16 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <unistd.h>
-#include <string.h>
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <errno.h>
 
-// HTTP Constants
-#define HTTP_OK                 200
-#define HTTP_BAD_REQUEST        400
-#define HTTP_NOT_FOUND          404
-#define HTTP_METHOD_NOT_ALLOWED 405
-#define HTTP_INTERNAL_ERROR     500
 
-// HTTP Message Macros
-#define HTTP_MSG_OK             "OK"
-#define HTTP_MSG_BAD_REQUEST    "Bad Request"
-#define HTTP_MSG_NOT_FOUND      "Not Found"
-#define HTTP_MSG_METHOD_NOT_ALLOWED "Method Not Allowed"
-#define HTTP_MSG_INTERNAL_ERROR "Internal Server Error"
+#include "http.h"
 
-// Max length macros
-#define MAX_REQUEST_SIZE 8192
-#define MAX_PATH_LEN 1024
-
+// Other macros
 #define DEFAULT_PORT 4433
 #define BACKLOG_QUEUE 10
-
-const char* GetHTTPSStatusMessage(int status) {
-	switch (status) {
-		case HTTP_OK: return HTTP_MSG_OK;
-		case HTTP_BAD_REQUEST: return HTTP_MSG_BAD_REQUEST;
-		case HTTP_NOT_FOUND: return HTTP_MSG_NOT_FOUND;
-		case HTTP_METHOD_NOT_ALLOWED: return HTTP_MSG_METHOD_NOT_ALLOWED;
-		case HTTP_INTERNAL_ERROR: return HTTP_MSG_INTERNAL_ERROR;
-		default: return "Unknown status.";
-	}
-}
-
-void HandleGet(SSL *ssl, const char *path) { 
-	if (strcmp(path, "/") == 0) {
-		const char response[] = 
-		"HTTP/1.1 200 OK\r\n"
-		"Content-Type: text/plain\r\n"
-		"\r\n";
-		SSL_write(ssl, response, strlen(response));
-		printf("%s\n", response);
-	} else {
-		const char *notFound = 
-		"HTTP/1.1 404 Not Found\r\n"
-		"Content-Length: 0\r\n"
-		"\r\n"
-		"404 Not Found";
-		SSL_write(ssl, notFound, strlen(notFound));
-	}
-}
-
-
-void HandleRequest(SSL *ssl, const char *request) {
-	char method[16], path[MAX_PATH_LEN], body[MAX_REQUEST_SIZE] = {0};
-	sscanf(request, "%15s %1023s", method, path);
-	const char *bodyStart = strstr(request, "\r\n\r\n");
-	if (bodyStart) { strlcpy(body, bodyStart + 4, sizeof(body)); }
-	
-	if (strcmp(method, "GET") == 0) {  HandleGet(ssl, path); }
-	else if (strcmp(method, "PUT") == 0) { }
-	else if (strcmp(method, "POST") == 0) { }
-	else if (strcmp(path, "/echo") == 0) { HandleEcho(ssl, body); }
-	else { return; }
-}
-
-
 
 int main(int argc, char **argv) {
 	int serverSocket, clientSocket;
@@ -116,18 +58,19 @@ int main(int argc, char **argv) {
 	SSL_library_init();
 	SSL_load_error_strings();
 	OpenSSL_add_all_algorithms();
-
+	
 	SSL_CTX *ctx = SSL_CTX_new(TLS_server_method());
 	if (!ctx) {
 		ERR_print_errors_fp(stderr);
 		exit(EXIT_FAILURE);
 	}
 
+	// Ensure certificate is read. Exit on failure.
 	if (SSL_CTX_use_certificate_file(ctx, "cert.pem", SSL_FILETYPE_PEM) <= 0) {
     		ERR_print_errors_fp(stderr);
     		exit(EXIT_FAILURE);
 	}
-
+	// Ensure private key is read. Exit on failure.
 	if (SSL_CTX_use_PrivateKey_file(ctx, "key.pem", SSL_FILETYPE_PEM) <= 0) {
     		ERR_print_errors_fp(stderr);
    		exit(EXIT_FAILURE);
