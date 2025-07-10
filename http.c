@@ -48,10 +48,11 @@ const char* GetHTTPStatusMessage(int status) {
 }
 
 void WriteError(SSL *ssl, int status) {
-	char response[1024];
+	char response[8192];
 	snprintf(response, sizeof(response),
 	"HTTP/1.1 %d %s\r\n"
 	"Content-Type: text/plain\r\n"
+	"Connection: keep-alive\r\n"
 	"\r\n"
 	"%d %s",
 	status, GetHTTPStatusMessage(status),
@@ -61,6 +62,10 @@ void WriteError(SSL *ssl, int status) {
 }
 
 int ParseRequestLine(const char *request, HTTPRequest *req) {
+	if (strlen(request) >= MAX_REQUEST_SIZE - 4) {
+		return 0;
+	}
+	
 	if (sscanf(request, "%15s %1023s %15s", req -> method, req -> path, req -> httpVersion) != 3) {
 		return 0;
 	}
@@ -73,7 +78,25 @@ int ParseRequestLine(const char *request, HTTPRequest *req) {
 	return 1;
 }
 
-void HandleGet(SSL *ssl, const char *path) {
+int ParseConnectionHeader(HTTPRequest *req) {
+	for (int i = 0; i < req->headerCount - 1; i++) {
+		if (strcasecmp(req->headers[i].name, "Connection") == 0) {
+			if (strcasecmp(req->headers[i].value, "keep-alive") == 0) {
+				req->keepAlive = 1;
+				return 1;
+			}
+		}
+	}
+	req->keepAlive = 0;
+	return 0;
+}
+
+void HandleGet(SSL *ssl, const char *path, int keepAlive) {
+	if (strlen(path) >= MAX_PATH_LEN - 4) {
+		WriteError(ssl, HTTP_BAD_REQUEST);
+		return;
+	}
+	
 	char fullPath[MAX_PATH_LEN];
 	if (strcmp(path, "/") == 0) {
 		snprintf(fullPath, sizeof(fullPath), "www/index.html");
@@ -86,6 +109,8 @@ void HandleGet(SSL *ssl, const char *path) {
 		WriteError(ssl, HTTP_NOT_FOUND);
 		return;
 	}
+	
+	char resolvedPath[MAX_PATH_LEN];
 	
 	// Get file size.
 	struct stat st;
@@ -118,24 +143,48 @@ void HandleGet(SSL *ssl, const char *path) {
 		"HTTP/1.1 200 OK\r\n"
 		"Content-Length: %zu\r\n"
 		"Content-Type: %s\r\n"
-		"Connection: close\r\n"
+		"Connection: %s\r\n"
 		"\r\n",
-		fileSize, contentType);
+		fileSize, contentType, keepAlive ? "keep-alive" : "close");
 	SSL_write(ssl, header, strlen(header));
 	SSL_write(ssl, fileBuffer, fileSize);
 	free(fileBuffer);
 }	
 
-void HandleRequest(SSL *ssl, const char *rawRequest) {
-	HTTPRequest req = {0};
+void HandleRequest(SSL *ssl, const char *rawRequest, HTTPRequest *req) {
+	memset(req, 0, sizeof(HTTPRequest));	
 
-	if (!ParseRequestLine(rawRequest, &req)) {
+
+	if (!ParseRequestLine(rawRequest, req)) {
 		WriteError(ssl, HTTP_BAD_REQUEST);
 		return;
 	}
-	if (strcmp(req.method, "GET") == 0) {
-		HandleGet(ssl, req.path);
-	} else if (strcmp(req.method, "PUT") == 0 || strcmp(req.method, "POST") == 0) {
+
+	const char *headerStart = strstr(rawRequest, "\r\n") + 2;
+	while (headerStart && *headerStart != '\r') {
+		char *headerEnd = strstr(headerStart, "\r\n");
+		if (!headerEnd) break;
+	
+
+		char headerLine[1024];
+		strncpy(headerLine, headerStart, headerEnd - headerStart);
+		headerLine[headerEnd - headerStart] = '\0';
+
+		char *colon = strchr(headerLine, ':');
+		if (colon && req->headerCount < MAX_HEADERS) {
+			*colon = '\0';
+			strncpy(req->headers[req->headerCount].name, headerLine, MAX_HEADER_NAME);
+			strncpy(req->headers[req->headerCount].value, colon + 2, MAX_HEADER_VALUE);
+			req -> headerCount++;
+		}
+
+		headerStart = headerEnd + 2;
+	}
+	ParseConnectionHeader(req);		
+	
+	if (strcmp(req->method, "GET") == 0) {
+		HandleGet(ssl, req->path, req->keepAlive);
+	} else if (strcmp(req->method, "PUT") == 0 || strcmp(req->method, "POST") == 0) {
 		WriteError(ssl, HTTP_METHOD_NOT_ALLOWED);
 	} else {
 		WriteError(ssl, HTTP_METHOD_NOT_ALLOWED);

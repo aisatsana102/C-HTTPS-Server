@@ -41,13 +41,14 @@ typedef struct {
     int headerCount;
     char *body;
     size_t bodyLength;
+    int keepAlive;
 } HTTPRequest;
 
 /* Public HTTP Functions  */
 const char *GetMimeType(const char *path);
-void HandleGet(SSL *ssl, const char *path);
+void HandleGet(SSL *ssl, const char *path, int keepAlive);
 int ParseRequestLine(const char *request, HTTPRequest *req);
-void HandleRequest(SSL *ssl, const char *rawRequest);
+void HandleRequest(SSL *ssl, const char *rawRequest, HTTPRequest *req);
 const char *GetHTTPStatusMessage(int code);
 void WriteError(SSL *ssl, int statusCode);
 
