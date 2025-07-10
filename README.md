@@ -75,5 +75,5 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 - [ankushagarwal/nweb](https://github.com/ankushagarwal/nweb) — A minimalist web server in C that served as inspiration.
 - [Wikipedia: HTTP](https://en.wikipedia.org/wiki/HTTP) — Overview of the HTTP protocol.
 - [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110) — HTTP/1.1 semantics specification from the IETF.
-- [RFC 9112](https://www.rfc-editor.org/rfc/rfc9112) - HTTP/1.1 
+- [RFC 9112](https://www.rfc-editor.org/rfc/rfc9112) - HTTP/1.1. 
 and many others!
