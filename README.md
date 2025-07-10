@@ -3,7 +3,7 @@
 A lightweight HTTPS server written in C, leveraging OpenSSL for secure TLS connections. This project serves static HTML content and is ideal for educational purposes or as a foundational component for more complex web servers.
 
 ## Features
-
+- **HTTP/1.1
 - **HTTPS Support**: Secure communication using TLS via OpenSSL.
 - **Static File Serving**: Serves files from the `www/` directory.
 - **Modular Codebase**: Separation of concerns with distinct modules for HTTP handling and server logic.
@@ -75,4 +75,5 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 - [ankushagarwal/nweb](https://github.com/ankushagarwal/nweb) — A minimalist web server in C that served as inspiration.
 - [Wikipedia: HTTP](https://en.wikipedia.org/wiki/HTTP) — Overview of the HTTP protocol.
 - [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110) — HTTP/1.1 semantics specification from the IETF.
+- [RFC 9112](https://www.rfc-editor.org/rfc/rfc9112) - HTTP/1.1 
 and many others!
